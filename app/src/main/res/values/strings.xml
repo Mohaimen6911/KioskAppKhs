@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Kiosk App Khs</string>
+    <string name="device_admin_description">Enables kiosk mode for this device.</string>
+</resources>

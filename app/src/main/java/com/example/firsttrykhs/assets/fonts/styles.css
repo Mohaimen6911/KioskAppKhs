@@ -1,0 +1,21 @@
+/* Load the local Source Sans Pro regular font */
+@font-face {
+  font-family: 'Source Sans Pro';
+  src: url('sourcesanspro-regular-webfont.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Optional: add other weights if you need them
+@font-face {
+  font-family: 'Source Sans Pro';
+  src: url('sourcesanspro-bold-webfont.woff2') format('woff2');
+  font-weight: bold;
+  font-style: normal;
+}
+*/
+
+/* Apply the font to the whole website */
+body {
+  font-family: 'Source Sans Pro', sans-serif;
+}

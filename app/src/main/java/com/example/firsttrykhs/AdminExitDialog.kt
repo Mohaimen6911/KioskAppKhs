@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -74,67 +75,75 @@ fun AdminExitDialog(
                     isError = isPasswordIncorrect
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                if (!showPasswordChangeDialog) {
-                    Button(
-                        onClick = {
-                            showPasswordChangeDialog = true
-                            password = ""
-                            isPasswordIncorrect = false // Reset incorrect state
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color.White,
-                            containerColor = Color.DarkGray
-                        )
-                    ) {
-                        Text("Passwort ändern")
-                    }
+                // Main action
+                Button(
+                    onClick = {
+                        val isValid = verifyPassword()
+                        isPasswordIncorrect = !isValid
+                        if (isValid) onUnlock()
+                        password = ""
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Entsperren")
                 }
 
                 if (isPasswordIncorrect) {
                     Text(
                         "Falsches Kennwort! Bitte versuchen Sie es erneut",
                         color = Color.Red,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
             }
         },
+        // Footer buttons
         confirmButton = {
-            Button(
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = Color.White,
-                    containerColor = Color.DarkGray
-                ),
-                onClick = {
-                    val isValid = verifyPassword()
-                    isPasswordIncorrect = !isValid
-                    if (isValid) onUnlock()
-                    password = ""
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Entsperren")
+                // Abbrechen on the left
+                Button(
+                    onClick = {
+                        password = ""
+                        isPasswordIncorrect = false
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF880808),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Abbrechen")
+                }
+
+                // Passwort ändern on the right
+                Button(
+                    onClick = {
+                        showPasswordChangeDialog = true
+                        password = ""
+                        isPasswordIncorrect = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF707272), // Blue-gray
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Passwort ändern")
+                }
             }
         },
-        dismissButton = {
-            Button(
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = Color.White,
-                    containerColor = Color.DarkGray
-                ),
-                onClick = {
-                    password = ""
-                    isPasswordIncorrect = false // Reset incorrect state
-                    onDismiss()
-                }
-            ) {
-                Text("Abbrechen")
-            }
-        },
+        dismissButton = {},
         containerColor = Color.LightGray
     )
 
@@ -149,3 +158,4 @@ fun AdminExitDialog(
         )
     }
 }
+

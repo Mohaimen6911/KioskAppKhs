@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -34,7 +35,7 @@ fun ReLockDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Kiosk-Modus erneut sperren") },
+        title = { Text("Kiosk-Modus erneut sperren" , fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 Text("Geben Sie das primäre Admin-Passwort ein, um den Kiosk-Modus erneut zu sperren:", fontSize = 18.sp)
@@ -88,16 +89,27 @@ fun ReLockDialog(
                     val isValid = verifyPassword()
                     isPasswordIncorrect = !isValid
                     if (isValid) onReLock()
-                }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                )
             ) {
                 Text("Sperren")
             }
         },
         dismissButton = {
-            Button(onClick = onDismiss) {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF880808), // Red background
+                    contentColor = Color.White          // White text
+                )
+            ) {
                 Text("Abbrechen")
             }
-        },
+        }
+        ,
         containerColor = Color.LightGray
     )
 }

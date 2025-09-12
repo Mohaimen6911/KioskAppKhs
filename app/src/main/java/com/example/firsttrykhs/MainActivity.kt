@@ -1,3 +1,4 @@
+// MainActivity.kt
 package com.example.firsttrykhs
 
 import AdminExitDialog
@@ -14,36 +15,43 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
-
 
 class MainActivity : ComponentActivity() {
     private lateinit var devicePolicyManager: DevicePolicyManager
     private lateinit var adminComponentName: ComponentName
     private lateinit var kioskPasswordManager: KioskPasswordManager
-    private var tapCount = 0
-    private val tapHandler = Handler(Looper.getMainLooper())
 
     private var isKioskModeEnabled by mutableStateOf(true)
     private var showPasswordChangeDialog by mutableStateOf(false)
+
+    // Tap detection
+    private var tapCount = 0
+    private val tapHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         Log.d(
             "GViewCheck",
-            "Using GeckoView version: " + GeckoSession::class.java.getPackage().implementationVersion
+            "Using GeckoView version: " + (GeckoSession::class.java.`package`?.implementationVersion ?: "Unknown")
         )
 
+        // Extra debug
+        Log.d("StartupMetrics", "Free mem: ${Runtime.getRuntime().freeMemory() / 1024} KB")
+        Log.d("StartupMetrics", "Prefs size: ${filesDir.resolve("shared_prefs/WebBrowserPrefs.xml").length()} bytes")
+
+        // Init
         kioskPasswordManager = KioskPasswordManager(this)
         devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
         adminComponentName = ComponentName(this, MyDeviceAdminReceiver::class.java)
 
+        // Terminal command handler
         handleTerminalCommand(intent)
 
         if (isKioskModeEnabled) enableKioskMode()
@@ -63,8 +71,9 @@ class MainActivity : ComponentActivity() {
                             else showReLockDialog = true
                         }
                     },
+
             ) {
-                WebBrowser(Modifier.padding(it), geckoRuntime = geckoRuntime)
+                WebBrowser(modifier = Modifier.padding(it), geckoRuntime = geckoRuntime)
 
                 if (showAdminDialog) {
                     AdminExitDialog(
@@ -124,7 +133,6 @@ class MainActivity : ComponentActivity() {
                                 finish()
                             }
                         }
-
                         cmd.startsWith("set-secondary ") -> {
                             val pass = cmd.substringAfter("set-secondary ").trim()
                             if (pass.length >= 4) {
@@ -136,15 +144,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-        }
-    }
-
-    private fun registerTap(onSuccess: () -> Unit) {
-        tapCount++
-        tapHandler.postDelayed({ tapCount = 0 }, 800)
-        if (tapCount >= 5) {
-            onSuccess()
-            tapCount = 0
         }
     }
 
@@ -168,9 +167,17 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Password too short (min 4 chars)", Toast.LENGTH_LONG).show()
             return
         }
-
         kioskPasswordManager.saveSecondaryPassword(newPassword)
         val hash = kioskPasswordManager.getSecondaryHash()
         Log.d("PasswordChange", "New hash: ${hash.take(10)}...")
+    }
+
+    private fun registerTap(onSuccess: () -> Unit) {
+        tapCount++
+        tapHandler.postDelayed({ tapCount = 0 }, 800)
+        if (tapCount >= 5) {
+            onSuccess()
+            tapCount = 0
+        }
     }
 }

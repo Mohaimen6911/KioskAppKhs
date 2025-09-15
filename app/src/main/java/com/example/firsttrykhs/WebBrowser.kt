@@ -9,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.mozilla.geckoview.*
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -110,23 +110,24 @@ fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
             }
         )
 
-        // --- Top-right tap/drag area ---
+        // --- Edge-swipe gesture (no blocking overlay) ---
         Box(
             modifier = Modifier
-                .size(50.dp)
-                .align(Alignment.TopEnd)
+                .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        isTopBarVisible = true
-                        resetTopBarTimer()
-                    }
-                }
-                .pointerInput(Unit) {
-                    detectTapGestures {
-                        isTopBarVisible = true
-                        resetTopBarTimer()
-                    }
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            // only trigger if the drag starts near the right edge & top area
+                            val density = this.size
+                            val rightEdge = size.width - 40.dp.toPx()
+                            val topArea = 80.dp.toPx()
+                            if (offset.x >= rightEdge && offset.y <= topArea) {
+                                isTopBarVisible = true
+                                resetTopBarTimer()
+                            }
+                        },
+                        onDrag = { _, _ -> } // no-op
+                    )
                 }
         )
 
@@ -140,7 +141,9 @@ fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
             TopAppBar(
                 title = {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -311,7 +314,8 @@ fun saveUrl(sharedPreferences: SharedPreferences, url: String) {
 }
 
 fun loadSavedUrl(sharedPreferences: SharedPreferences): String {
-    return sharedPreferences.getString("LAST_URL", "https://www.google.com") ?: "https://www.google.com"
+    return sharedPreferences.getString("LAST_URL", "https://www.google.com")
+        ?: "https://www.google.com"
 }
 
 fun loadUrlFromTextField(inputUrl: String, onUrlUpdated: (String) -> Unit) {
@@ -328,7 +332,8 @@ fun loadUrlFromTextField(inputUrl: String, onUrlUpdated: (String) -> Unit) {
         val port = if (uri.port > 0) ":${uri.port}" else ""
         val path = uri.path ?: ""
         val query = if (!uri.query.isNullOrEmpty()) "?${uri.query}" else ""
-        val finalUrl = if (host.isNotEmpty()) "$scheme://$host$port$path$query" else "https://www.google.com"
+        val finalUrl =
+            if (host.isNotEmpty()) "$scheme://$host$port$path$query" else "https://www.google.com"
         onUrlUpdated(finalUrl)
     } catch (e: Exception) {
         onUrlUpdated("https://www.google.com")

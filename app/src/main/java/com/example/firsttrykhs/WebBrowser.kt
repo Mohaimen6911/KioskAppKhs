@@ -1,5 +1,6 @@
 package com.example.firsttrykhs
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -9,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,8 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.mozilla.geckoview.*
-import kotlin.math.abs
 
+@SuppressLint("ReturnFromAwaitPointerEventScope")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
@@ -66,14 +68,55 @@ fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
     var lastLoadedUrl by remember { mutableStateOf(url) }
     var lastProgress by remember { mutableStateOf(0) }
 
-    // Handler for top bar auto-hide
     val handler = remember { Handler() }
     val resetTopBarTimer = {
         handler.removeCallbacksAndMessages(null)
-        handler.postDelayed({ isTopBarVisible = false }, 2000) // hide after 2 seconds
+        handler.postDelayed({ isTopBarVisible = false }, 2000)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    var startY: Float? = null
+                    var inCorner = false
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.first()
+
+                        if (change.pressed && !change.previousPressed) {
+                            // First touch
+                            inCorner =
+                                change.position.x >= size.width - 50.dp.toPx() &&
+                                        change.position.y <= 50.dp.toPx()
+                            if (inCorner) startY = change.position.y
+                        }
+
+                        if (inCorner && change.pressed && startY != null) {
+                            val dy = change.position.y - startY!!
+                            // show bar only after a downward drag of at least 20 dp
+                            if (dy > 20.dp.toPx()) {
+                                isTopBarVisible = true
+                                resetTopBarTimer()
+                                startY = null          // prevent multiple triggers
+                            }
+                        }
+
+                        if (!change.pressed) {
+                            // finger lifted – reset
+                            startY = null
+                            inCorner = false
+                        }
+
+                        // do NOT consume, so GeckoView still scrolls
+                    }
+                }
+            }
+
+
+    ) {
         // --- GeckoView ---
         AndroidView(
             modifier = Modifier.matchParentSize(),
@@ -88,7 +131,6 @@ fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
                     }
 
                     override fun onPageStop(session: GeckoSession, success: Boolean) {}
-
                     override fun onProgressChange(session: GeckoSession, progress: Int) {
                         lastProgress = progress
                     }
@@ -99,36 +141,13 @@ fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
                         session: GeckoSession,
                         uri: String?,
                         error: WebRequestError
-                    ): GeckoResult<String>? {
-                        return null
-                    }
+                    ): GeckoResult<String>? = null
                 }
 
                 geckoView.setSession(geckoSession)
                 geckoSession.loadUri(url)
                 geckoView
             }
-        )
-
-        // --- Edge-swipe gesture (no blocking overlay) ---
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            // only trigger if the drag starts near the right edge & top area
-                            val density = this.size
-                            val rightEdge = size.width - 40.dp.toPx()
-                            val topArea = 80.dp.toPx()
-                            if (offset.x >= rightEdge && offset.y <= topArea) {
-                                isTopBarVisible = true
-                                resetTopBarTimer()
-                            }
-                        },
-                        onDrag = { _, _ -> } // no-op
-                    )
-                }
         )
 
         // --- TopBar overlay ---
@@ -141,9 +160,7 @@ fun WebBrowser(modifier: Modifier = Modifier, geckoRuntime: GeckoRuntime) {
             TopAppBar(
                 title = {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -314,28 +331,18 @@ fun saveUrl(sharedPreferences: SharedPreferences, url: String) {
 }
 
 fun loadSavedUrl(sharedPreferences: SharedPreferences): String {
-    return sharedPreferences.getString("LAST_URL", "https://www.google.com")
-        ?: "https://www.google.com"
+    return sharedPreferences.getString("LAST_URL", "https://www.google.com") ?: "https://www.google.com"
 }
 
+// --- URL loader preserves exact input, ports, query parameters ---
 fun loadUrlFromTextField(inputUrl: String, onUrlUpdated: (String) -> Unit) {
     val trimmed = inputUrl.trim()
+
     if (trimmed.isEmpty()) {
+        // Fallback if user entered nothing
         onUrlUpdated("https://www.google.com")
-        return
-    }
-    val urlWithScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "https://$trimmed"
-    try {
-        val uri = Uri.parse(urlWithScheme)
-        val host = uri.host ?: uri.path?.substringBefore("/") ?: ""
-        val scheme = uri.scheme ?: "https"
-        val port = if (uri.port > 0) ":${uri.port}" else ""
-        val path = uri.path ?: ""
-        val query = if (!uri.query.isNullOrEmpty()) "?${uri.query}" else ""
-        val finalUrl =
-            if (host.isNotEmpty()) "$scheme://$host$port$path$query" else "https://www.google.com"
-        onUrlUpdated(finalUrl)
-    } catch (e: Exception) {
-        onUrlUpdated("https://www.google.com")
+    } else {
+        // Pass everything exactly as typed
+        onUrlUpdated(trimmed)
     }
 }

@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
     private fun registerTap(onSuccess: () -> Unit) {
         tapCount++
         tapHandler.postDelayed({ tapCount = 0 }, 800)
-        if (tapCount >= 5) {
+        if (tapCount >= 1) {
             onSuccess()
             tapCount = 0
         }
